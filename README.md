@@ -1,5 +1,7 @@
 <<<<<<< HEAD
-# Bioinformatic-scripts-of-PhD-Jing-Yuan
+# PhD project: Epigeneic Regulatory Network Analysis of Human Glioblastomas
+
+Bioinformatic-scripts
 The scripts for all the transcriptome analysis including RNA-seq analysis, differential expression analysis, chromosome analysis
 
 1. RNA-seq dataset analysis of high grade glioma tumour tissue from University of Warwick shaire and Coventry
