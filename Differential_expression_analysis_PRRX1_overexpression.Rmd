@@ -1,0 +1,440 @@
+---
+title: "PRRX1_overexpression_analysis"
+author: "Jing Yuan"
+date: "07/12/2021"
+output: html_document
+highlight: differential expression
+---
+
+## **R work (DESeq2)**
+### setup
+Libraries and function
+```{r message=FALSE}
+rm(list=ls())
+getwd()
+setwd("/Users/u1566273/Desktop/Hek293/Deseq2_human/")
+source(file='~/bins/dataFunctions.r')
+library(DESeq2)
+library(tidyverse)
+library(cowplot); theme_set(theme_cowplot())
+library(ggforce)
+library(reshape2)
+library(pheatmap)
+library(ComplexHeatmap)
+library(RColorBrewer)
+library(magrittr)
+library(patchwork)
+library(EnhancedVolcano)
+library(writexl)
+library(patchwork)
+library(ggplotify)
+```
+
+# Some functions
+```{r functions}
+tpms_from_dds <- function(dds, gene_lengths) {
+  counts(dds, normalized = F) %>%
+  as_tibble(rownames = "id") %>%
+  inner_join(read_tsv(gene_lengths, col_types = cols()), 
+             by="id") %>%
+  mutate(across(-c(id, length), ~ (.x / length)),       # rpk = count / length
+         across(-c(id, length), ~ 1e+6 * .x / sum(.x)), # tpm = 1M * rpk / sum(rpk)
+         across(-c(id, length), ~ log2(1 + .x))) %>%    # log2tpm = log2(1 + tpm) %>%
+  dplyr::select(-length)
+}
+
+deg_cts = function(res, cts, ...) {
+  res %>%
+    #as_tibble(rownames = "id") %>%
+    inner_join(cts, by = "id") %>%
+    filter(...)
+}
+
+scatter_plot = function(cts, x, y) {
+  ggplot(cts, aes({{ x }}, {{ y }})) +
+    geom_abline(slope = 1, color= "red") +
+    geom_point(shape=16, size=0.3, alpha=0.5) +
+    scale_y_log10() + scale_x_log10()
+}
+
+# Wrapper for enhancedVolcano
+enhanced_volcano <- function(res, lab = NA, xlim = c(-5, 5), ylim = c(0, 12.5), pCutoff = 0.01, FCcutoff = 1, 
+                             sample = "", reference = "", n_degs = filter(res, padj < pCutoff, abs(log2FoldChange) > FCcutoff) %>% nrow(),
+                             title = paste0(sample, " vs ", reference, " (" , n_degs, " DEGs)"), caption = FALSE,
+                             label.x = 3.75, label.y = 9, size.title = 30, size.label = size.title / 3) {
+  
+  n_degs_down <- filter(res, padj < pCutoff, log2FoldChange < -FCcutoff) %>% nrow()
+  n_degs_up   <- filter(res, padj < pCutoff, log2FoldChange >  FCcutoff) %>% nrow()
+  
+  EnhancedVolcano(res, lab = NA, x = 'log2FoldChange', y = 'padj', xlim = xlim, ylim = ylim, pCutoff = pCutoff, FCcutoff = FCcutoff, shape = 16, 
+                  title = title, subtitle = NULL, caption = if(caption) paste0("total = ", nrow(res), " genes"), titleLabSize = size.title) +
+    annotate("text", x = -label.x, y = label.y, label = paste(n_degs_down, "down"), size = size.label) +
+    annotate("text", x =  label.x, y = label.y, label = paste(n_degs_up,     "up"),  size = size.label)
+}
+```
+
+### Load counts and run DESeq2
+Create sample table
+```{r}
+htseqDir = "counting_PRRX1"
+sampleDataFilename = "sampletable_PRRX1.txt"
+sampleTable = read.table(sampleDataFilename,header=TRUE) %>%
+  mutate(cellName = as_factor(cellName),
+         InduceTime = as_factor(InduceTime),
+         replicas = as_factor(replicas),
+         condition = str_remove(Samples, "_[:digit:]$") %>% as_factor())
+```
+
+# Make `dds` object
+```{r}
+dds_original <- DESeqDataSetFromHTSeqCount(sampleTable = sampleTable, directory = htseqDir, design = ~ condition)
+```
+
+# Run DESeq on the dds object
+```{r}
+dds_original <- DESeq(dds_original)
+```
+
+# Save it for future use
+```{r}
+#save(dds_original, file = "dds.Rdata")
+load("dds.Rdata")
+```
+
+# Get normalised counts
+```{r}
+cts_original <- dds_original %>%
+  counts(normalized = T) %>% 
+  as_tibble(rownames = "id")
+```
+
+# Get vst (Variance Stabilised Transformation), it will make your valued approach a normal distribution, as compared to a negative binomial distribution of the normalised counts.
+```{r}
+vsd_original <- dds_original %>% 
+  vst(blind=F) %>% 
+  assay() %>%
+  as_tibble(rownames = "id")
+```
+
+### Scatter plots
+# Function to have a matrix of scatter plots
+```{r fig.height=5, fig.width=6}
+scatter_matrix <- function(cts, condition, log_values = TRUE, title = paste("Scatter plot of log(normalised counts) from", condition)) {
+  cts %>%
+    select(id, starts_with(condition)) %>%
+    {if(log_values) mutate(., across(-id, ~ log2(1 + .))) else .} %>%
+    add_column(slope=1) %>% 
+    add_column(intercept=0) %>%
+    ggplot(aes(x = .panel_x, y = .panel_y)) +
+    geom_abline(aes(intercept=intercept, slope=slope), color = "red") +
+    geom_point(shape=16, size=0.3, alpha=0.5) +
+    geom_point(shape=16, size=0, alpha = 0) +
+    geom_density2d() +
+    geom_autohistogram(color = 1, fill = 3) +
+    facet_matrix(vars(-c(id, slope, intercept)), layer.upper = 1:2, layer.lower = c(1, 3, 4), layer.diag = 5) +
+    theme(axis.line=element_blank(), panel.border = element_rect(colour="black", size=1, fill=NA), 
+        strip.background = element_blank(),plot.title = element_text(hjust = 0.5)) +
+    ggtitle(title)
+}
+```
+
+```{r fig.height=6, fig.width=6}
+scatter_matrix(cts_original, "WT_0h")
+```
+
+```{r fig.height=6, fig.width=6}
+scatter_matrix(cts_original, "WT_3h")
+```
+```{r fig.height=6, fig.width=6}
+scatter_matrix(cts_original, "WT_6h")
+```
+```{r fig.height=6, fig.width=6}
+scatter_matrix(cts_original, "PRRX1_3H")
+```
+```{r fig.height=6, fig.width=6}
+scatter_matrix(cts_original, "PRRX1_6H")
+```
+```{r fig.height=11, fig.width=10}
+(scatter_matrix_cts <- scatter_matrix(cts_original, "WT_0h", title = "WT_0h") + 
+  scatter_matrix(cts_original, "WT_3h", title = "WT_3h") +
+  scatter_matrix(cts_original, "WT_6h", title = "WT_6h") +
+  scatter_matrix(cts_original, "PRRX1_3H", title = "PRRX1_3H") + scatter_matrix(cts_original, "PRRX1_6H", title = "PRRX1_6H") +
+   plot_annotation(title = "Scatter plots of log(1 + normalised counts)",
+                   subtitle = "diagonal of the matrix represents distribution of expression values \nbottom half show density plot of expression values",
+                   caption = "Disclaimer: y axis on diagonal matrix doesn't match the axis labels")) 
+
+ggsave(filename = "scatter_plots/scater_matrix_normalised_counts_15samples.pdf", plot = scatter_matrix_cts, height = 11, width = 10)
+```
+```{r fig.height=11, fig.width=10}
+(scatter_matrix_vsd <- scatter_matrix(vsd_original, "WT_0h", title = "WT_0h", log_values = FALSE) + 
+  scatter_matrix(vsd_original, "WT_3h", title = "WT_3h", log_values = FALSE) +
+  scatter_matrix(vsd_original, "WT_6h", title = "WT_6h", log_values = FALSE) +
+  scatter_matrix(vsd_original, "PRRX1_3H", title = "PRRX1_3H", log_values = FALSE) + scatter_matrix(vsd_original, "PRRX1_6H", title = "PRRX1_6H") +
+  plot_annotation(title = "Scatter plots of vsd (variance stabilised transformed counts)",
+                  subtitle = "diagonal of the matrix represents distribution of expression values \nbottom half show density plot of expression values",
+                  caption = "Disclaimer: y axis on diagonal matrix doesn't match the axis labels")) 
+
+ggsave(filename = "scatter_plots/scater_matrix_vsd.pdf", plot = scatter_matrix_vsd, height = 11, width = 10)
+```
+
+# Patchwork way to get the scatter plots
+```{r fig.height=5, fig.width=6, warning=FALSE}
+(scatter_plot(cts_original, PRRX1_3h_1, PRRX1_3h_2) | scatter_plot(cts_original, PRRX1_3h_3, PRRX1_3h_2)) /
+    (scatter_plot(cts_original, PRRX1_3h_1, PRRX1_3h_3) | scatter_plot(cts_original, PRRX1_3h_3, PRRX1_3h_3)) 
+```
+
+### PCAs
+# General function for all RNA-seq that takes vsd (or other kind of counts) and returns a table of Principal Components 
+```{r}
+pca_tidy = function(counts, ntop = 5000, sampletable = NULL) {
+  # pick the top n genes by variance
+  top_genes <- counts %>%
+    rowwise(id) %>% # calculate the variance for each gene
+    mutate(var = var(c_across(everything()))) %>%
+    ungroup() %>%
+    slice_max(var, n = ntop) %>% # pick only the top n
+    select(-var)
+  
+  # perform a PCA on the data
+  pca <- top_genes %>%
+    select(-id) %>% 
+    na.omit() %>% 
+    t() %>% 
+    prcomp()
+  
+  # convert it to a table
+  pca$x %>%
+    as_tibble(rownames = "sample") %>%
+    rename_with(~ pca$sdev^2 %>%        # square the sd to get the variance
+                  divide_by(sum(.)) %>% # divide it by the sum of variances
+                  multiply_by(100) %>%  # *100 to get a percentage of variance
+                  round() %>%           # round it
+                  str_c(.x, " [", ., "%]"), # paste it to the PCx 
+                .cols = -sample) %>% # exclude the sample column 
+    {
+      if (is.null(sampletable)) .
+      else left_join(., sampletable, by = c("sample" = "Samples"))
+    }
+}
+```
+
+```{r}
+pca_tidy(vsd_original, sampletable = sampleTable)
+```
+
+# Aesthetics to plot the PCA
+```{r}
+cellName_colors = c(HEK293 = 1, PRRX1 = 2)
+InduceTime_shapes= c("0h" = 21, "3h" = 24, "6h" = 23)
+
+```
+
+# Function to make a matrix of PCA plots for 15 human samples
+```{r}
+pca_matrix = function(pctable, pcs = 1:3) {
+  ggplot(pctable, aes(x = .panel_x, y = .panel_y)) + 
+    theme_cowplot() +
+    theme(axis.line=element_blank(), panel.border = element_rect(colour="black", size=1, fill=NA), strip.background = element_blank(),
+          plot.title = element_text(hjust = 0.5)) +
+    scale_shape_manual("DOX time", values = InduceTime_shapes) +
+    scale_fill_manual("Genotype", values = cellName_colors) +
+    guides(fill = guide_legend(override.aes = list(shape = 22))) +
+    geom_mark_ellipse(aes(fill = cellName, group = paste(cellName, InduceTime))) +
+    geom_autohistogram(aes(fill = cellName), color=1, size = 0.6, alpha=0.7, show.legend = FALSE) +
+    geom_point(size=2, color="black", aes(fill = cellName, shape = InduceTime)) +
+    facet_matrix(vars(pcs +1), layer.lower = c(1, 3), layer.upper = 3, layer.diag = 2)
+}
+```
+
+# PCA plots of the vsd counts
+```{r fig.height=8, fig.width=9}
+(pca_plot_vsd <- pca_tidy(vsd_original, sampletable = sampleTable) %>%
+  pca_matrix() +
+  labs(title = ("Matrix of PCs for vsd (variance stabilised transformed counts)"),
+       subtitle = "Percentage of variance explained by each PC in square brackets"))
+
+ggsave(filename = "PCA_plots/PCA_matrix_15samples.pdf", plot = pca_plot_vsd, width = 8.5, height = 8)
+
+```
+
+### DEGs 15 human samples
+# Get the statistics for each of the comparisons in a list
+```{r}
+res_original = list(
+  PRRX1_3h = results(dds_original, contrast=c("condition", "PRRX1_3h", "WT_3h")) %>% as_tibble(rownames = "id"), 
+  PRRX1_6h = results(dds_original, contrast=c("condition", "PRRX1_6h", "WT_6h")) %>% as_tibble(rownames = "id")
+)
+```
+
+# get the counts for the DEGs (also as a list)
+```{r}
+DEGs_cts_original <- map(res_original, ~ deg_cts(.x, cts_original))
+```
+
+# Join all DEGs with its counts in a unique table
+```{r}
+DEGs_cts_all_original <- DEGs_cts_original %>%
+  map_df(.id = "comparison", ~ .x)
+```
+
+```{r}
+DEGs_cts_all_original %>% 
+  filter(padj < 0.01, abs(log2FoldChange) > 0.5) %>% 
+  #group_by(comparison) %>%
+  group_by(comparison,  log2FoldChange > 0) %>%
+  count(comparison)
+```
+
+### get the list of DEGs
+```{r}
+DEGs_cts_p01_lfc05_PRRX1 <- map(DEGs_cts_original, ~ filter(., padj < 0.01, abs(log2FoldChange) > 0.5))
+```
+
+#Write the DEGs to a Excel file with tabs for each comparison
+```{r}
+writexl::write_xlsx(DEGs_cts_p01_lfc05_PRRX1, path = "DEGs_p01_lfc05_PRRX1_with_counts.xlsx")
+```
+
+### Volcano plots all samples
+#Using enhanced volcano
+```{r fig.width=12,  fig.height=16}
+(volcanos_original <- enhanced_volcano(res_original$PRRX1_3h, sample = "PRRX1_3h", reference = "WT_3h", size.title = 20) /
+  enhanced_volcano(res_original$PRRX1_6h, sample = "PRRX1_6h", reference = "WT_6h", size.title = 20, caption = TRUE) +
+  plot_layout(guides = 'collect') &  theme(legend.position = 'bottom'))
+
+ggsave(filename = "volcano_plots/volcano_plots_original.pdf", plot = volcanos_original, width = 12, height = 16)
+
+(volcanos_lf05 <- enhanced_volcano(res_original$PRRX1_3h, sample = "PRRX1_3h", reference = "WT_3h", size.title = 20, FCcutoff = 0.5) /
+  enhanced_volcano(res_original$PRRX1_6h, sample = "PRRX1_6h", reference = "WT_6h", size.title = 20, caption = TRUE, FCcutoff = 0.5) +
+  plot_layout(guides = 'collect') &  theme(legend.position = 'bottom'))
+
+ggsave(filename = "volcano_plots/volcano_plots_lf05.pdf", plot = volcanos_lf05, width = 12, height = 16)
+```
+
+### MAplots
+```{r}
+ma_plot <- function(res, p_cutoff = 0.01, fc_cutoff = 1, ylim = NA) {
+  filtered <- res %>%
+    filter(!is.na(padj), !is.na(log2FoldChange)) %>%
+    mutate(significance = case_when(padj < p_cutoff & abs(log2FoldChange) > fc_cutoff ~ "p and FC",
+                            padj < p_cutoff                                   ~ "ns",
+                            abs(log2FoldChange) > fc_cutoff                   ~ "ns", 
+                            TRUE                                              ~ "ns")) 
+  
+  ggplot(filtered, aes(x = log(baseMean), y = log2FoldChange, color = significance)) +
+    geom_hline(yintercept = 0, linetype = "dashed") +
+    geom_point(shape = 16, alpha = 0.2) +
+    geom_point(data = filtered %>% filter(significance == "p and FC"), shape = 16, alpha = 1) +
+    scale_color_manual(values = c(1, 2)) +
+    ylim(-ylim, ylim)
+}
+```
+  
+```{r}
+ma_plot(res_original$PRRX1_3h, ylim = 4)
+```
+
+```{r}
+ma_plot(res_original$PRRX1_6h, ylim = 8)
+```
+
+### Heatmaps
+```{r}
+vsd = vsd_original
+```
+
+```{r}
+deg_mat = function(res, cts, ..., scaled = FALSE) {
+  deg_cts(res, cts, ...) %>% # ...) %>%
+    column_to_rownames("id") %>%
+    select(-c(baseMean:padj)) %>%
+    rename_with(~ .x %>% toupper() %>% str_replace_all("_", " ")) %>%
+    as.matrix() %>% 
+    {if(scaled) {t(.) %>% scale() %>% t()}
+      else .}
+}
+
+hm_wrapper = function(mat, scaled = F, cluster_rows = T, cluster_columns = T) {
+  if(scaled) {col = rev(brewer.pal(9, "RdBu"));  name = "scaled\nexpression"}
+  else       {col = brewer.pal(9, "YlOrRd"); name = "expression"}
+  Heatmap(mat, cluster_rows = cluster_rows, cluster_columns = cluster_columns, show_row_names = F, col = col, name = name)
+}
+
+deg_hm = function(res, cts, ..., scaled = F, file = F, title = "") {
+  mat = deg_mat(res=res, cts=cts, ...=..., scaled=scaled)
+  hm = hm_wrapper(mat, scaled=scaled)
+  
+  if (file != 0) pdf(file, height=5, width=5)
+  draw(hm, column_title = paste(nrow(mat),title,"DEGs",deparse(substitute(...))))
+  if (file != 0) dev.off()
+  #if (is.null(file)) return(hm)
+}
+```
+
+```{r} 
+mats <- list(raw = map(res_original, ~ deg_mat(.x, vsd, padj < 0.01, abs(log2FoldChange) > 1)), scaled = map(res_original, ~ deg_mat(.x, vsd, padj < 0.01, abs(log2FoldChange) > 1)))
+  
+mats$PRRX1_3h$raw = deg_mat(res_original$PRRX1_3h, vsd, padj < 0.01, abs(log2FoldChange) > 1)
+mats$PRRX1_3h$scaled = deg_mat(res_original$PRRX1_3h, vsd, padj < 0.01, abs(log2FoldChange) > 1, scaled = T)
+mats$PRRX1_6h$raw = deg_mat(res_original$PRRX1_6h, vsd, padj < 0.01, abs(log2FoldChange) > 1)
+mats$PRRX1_6h$scaled = deg_mat(res_original$PRRX1_6h, vsd, padj < 0.01, abs(log2FoldChange) > 1, scaled = T)
+```
+
+```{r}
+hm_wrapper(mats$PRRX1_3h$scaled, scaled = T) +
+  hm_wrapper(mats$PRRX1_3h$raw)
+```
+
+```{r}
+#padj <0.01, log2FC >0.05
+deg_hm(res_original$PRRX1_3h, vsd, padj < 0.01, abs(log2FoldChange) > 0.5, title = "PRRX1 3h", scaled = T, file="heatmaps/heatmap_DEGs_PRRX1_3h_p0.01_lfc05.pdf")
+
+deg_hm(res_original$PRRX1_3h, vsd %>% select(id, WT_3h_1:WT_3h_3, PRRX1_3h_1:PRRX1_3h_3), padj < 0.01, abs(log2FoldChange) > 0.5, title = "PRRX1 3h scaled", scaled = TRUE, file="heatmaps/heatmap_DEGs_PRRX1_3h_only_p0.01_lfc05.pdf")
+
+deg_hm(res_original$PRRX1_6h, vsd, padj < 0.01, abs(log2FoldChange) > 0.5, title = "PRRX1 6h",  scaled = T, use_raster = TRUE, file="heatmaps/heatmap_DEGs_PRRX1_6h_p0.01_lfc05.pdf")
+
+deg_hm(res_original$PRRX1_6h, vsd %>% select(id, WT_6h_1:WT_6h_3, PRRX1_6h_1:PRRX1_6h_3), padj < 0.01, abs(log2FoldChange) > 0.5, title = "PRRX1 6h scaled", scaled = TRUE, file="heatmaps/heatmap_DEGs_PRRX1_6h_only_p0.01_lfc05.pdf")
+
+PRRX1_3h <- deg_hm(res_original$PRRX1_3h, vsd, padj < 0.01, abs(log2FoldChange) > 0.5, title = "PRRX1 3h", scaled = T)
+
+PRRX1_3h_scaled <- deg_hm(res_original$PRRX1_3h, vsd %>% select(id, WT_3h_1:WT_3h_3, PRRX1_3h_1:PRRX1_3h_3), padj < 0.01, abs(log2FoldChange) > 0.5, title = "PRRX1 3h scaled", scaled = TRUE)
+
+PRRX1_6h <- deg_hm(res_original$PRRX1_6h, vsd, padj < 0.01, abs(log2FoldChange) > 0.5, title = "PRRX1 6h",  scaled = T, use_raster = TRUE)
+
+PRRX1_6h_scale <- deg_hm(res_original$PRRX1_6h, vsd %>% select(id, WT_6h_1:WT_6h_3, PRRX1_6h_1:PRRX1_6h_3), padj < 0.01, abs(log2FoldChange) > 0.5,title = "PRRX1 6h scaled", scaled = TRUE)
+
+plot_grid(PRRX1_3h, PRRX1_3h_scaled, PRRX1_6h,PRRX1_6h_scale,
+          labels = c("A", "B", "C", "D"),
+          ncol = 2, nrow = 2)
+
+pdf("test.pdf", height = 20, width = 20)
+(as.ggplot(PRRX1_3h) | as.ggplot(PRRX1_3h_scaled)) / (as.ggplot(PRRX1_6h) | as.ggplot(PRRX1_6h_scale)) + plot_annotation(tag_levels = 'A')
+dev.off()
+```
+
+```{r}
+pheatmap::pheatmap(mats$PRRX1_3h$scaled, border_color = NA, cellwidth = 15, show_rownames = FALSE)
+pheatmap::pheatmap(mats$PRRX1_6h$scaled, border_color = NA, cellwidth = 15, show_rownames = FALSE)
+
+```
+
+###Go term analysis
+#using library gProfiler
+```{r}
+library(gprofiler2)
+```
+
+# GO terms enriched at FDR<0.01
+```{r, fig.width=10,fig.height=6}
+DEGs_cts_p01_lfc1_PRRX1_3h = DEGs_cts_p01_lfc1_PRRX1$PRRX1_3h$id %>% str_remove("\\..*")
+
+gostres_3h <- gost(query = DEGs_cts_p01_lfc1_PRRX1_3h, organism = 'hsapiens', user_threshold = 0.01, significant = FALSE)
+
+DEGs_cts_p01_lfc1_PRRX1_6h = DEGs_cts_p01_lfc1_PRRX1$PRRX1_6h$id %>% str_remove("\\..*")# %>% cat(sep = "\n")
+gostres_6h <- gost(query = DEGs_cts_p01_lfc1_PRRX1_6h, organism = 'hsapiens', user_threshold = 0.01, significant = FALSE)
+
+options(repr.plot.width = 4, repr.plot.height = 3)
+p <- gostplot(gostres_3h, capped = FALSE, interactive = T)
+p
+
+```
