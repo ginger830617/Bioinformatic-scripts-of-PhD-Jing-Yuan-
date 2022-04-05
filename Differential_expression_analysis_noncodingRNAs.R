@@ -1,4 +1,4 @@
-#Differential expression analysis of UHCW
+#Differential expression analysis of non-coding RNAs from UHCW
 
 rm(list=ls())
 setwd("/Users/u1566273/Projects/Marcos_datasets")
