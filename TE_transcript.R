@@ -78,27 +78,14 @@ The expected output files are:
 
 TEtranscripts  --sortByPos --format BAM -t WTCHG_110734_19Aligned.sortedByCoord.out.bam WTCHG_109791_04Aligned.sortedByCoord.out.bam WTCHG_109791_05Aligned.sortedByCoord.out.bam WTCHG_109791_06Aligned.sortedByCoord.out.bam -c WTCHG_110084_13Aligned.sortedByCoord.out.bam WTCHG_109791_02Aligned.sortedByCoord.out.bam WTCHG_110734_16Aligned.sortedByCoord.out.bam WTCHG_110084_07Aligned.sortedByCoord.out.bam WTCHG_110734_18Aligned.sortedByCoord.out.bam --GTF /home/u1566273/reference_genome/Genoma_data/gencode.v22.annotation.gtf --TE /home/u1566273/reference_genome/Genoma_data/hg38_rmsk_TE.gtf --mode multi -f 2 -p 0.001 --project /home/u1566273/RNASEQ_data/counts/nine_test_lp
 
-TEcount  --sortByPos --format BAM --mode multi -b WTCHG_109791_02.bam --GTF /home/u1566273/reference_genome/Genoma_data/gencode.v22.annotation.gtf --TE /home/u1566273/reference_genome/Genoma_data/GRCh38_rmsk_TE.gtf --project /home/u1566273/RNASEQ_data/counts/nine_test_lp
-
 
 #grep DE_TE list
 grep -f my_gene_and_transcript_list.txt genes.gtf > selected_genes.gtf
 
-grep -f 60kb_lncRNA.txt gencode.v28.long_noncoding_RNAs.gtf > selected_lncRNAgenes_60Kb.gtf
-grep -f 60kb_mRNA.txt /Volumes/Jing.Y4/Backup/TCGA38\ GENOME\ HUMAN/gencode.v22.annotation.gtf > selected_mRNAgenes_60Kb.gtf
-grep -f 60kb_mRNA.txt /Volumes/Jing.Y4/Backup/TCGA38\ GENOME\ HUMAN/gencode.v22.annotation.gtf > selected_mRNAgenes_60Kb.gtf
-
-
 grep -w -F -f DE_TE.txt /home/u1566273/reference_genome/Genoma_data/hg38_rmsk_TE_1.gtf > selected_TE.gtf 
-grep -f DE_TE.txt /home/u1566273/reference_genome/Genoma_data/hg38_rmsk_TE_1.gtf > selected_TE.txt
 grep -f TE_DE1.txt /home/u1566273/reference_genome/Genoma_data/hg38_rmsk_TE_1.gtf > selected_TE1.txt
 
-
-while read gene; do grep '$gene' /home/u1566273/reference_genome/Genoma_data/gencode.v22.annotation.gtf > /home/u1566273/RNASEQ_data/subset_mRNA.txt; done < /home/u1566273/RNASEQ_data/Differentially_expressed_gene1.txt
-
 while read gene; do grep '$gene' /home/u1566273/reference_genome/Genoma_data/hg38_rmsk_TE.gtf ; done < /home/u1566273/RNASEQ_data/DE_TE.txt > subset_TE.txt
-
-while read gene; do grep $gene /home/u1566273/reference_genome/Genoma_data/gencode.v28.long_noncoding_RNAs.gtf ; done < /home/u1566273/RNASEQ_data/Differentially_expressed_gene_lncRNA0.001.txt > subset_lncRNA.txt
 
 
 
