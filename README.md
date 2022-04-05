@@ -10,6 +10,4 @@ The scripts for all the transcriptome analysis including RNA-seq analysis, diffe
 4. Chromosomal abnormalities analysis of high grade glioma tumour tissue from University of Warwick shaire and Coventry
 
 =======
-# Bioinformatic-scripts-of-PhD-Jing-Yuan
-The scripts for all the transcriptome analysis
 >>>>>>> parent of cc6309f (Update README.md)
