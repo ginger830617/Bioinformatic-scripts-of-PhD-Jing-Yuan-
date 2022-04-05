@@ -1,2 +1,2 @@
-# Bioinformatic-scripts-of-PhD-Jing-Yuan-
+# Bioinformatic-scripts-of-PhD-Jing-Yuan
 The scripts for all the transcriptome analysis
