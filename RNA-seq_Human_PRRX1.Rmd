@@ -1,21 +1,12 @@
 ---
-title: "#RNA-seq analysis of overxpression hek293-prrx1 cell lines"
+title: "#RNA-seq analysis of PRRX1 overxpressed Hek293 cell lines"
 author: "JING YUAN"
 date: "25/11/2021"
 ---
-
-
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = T, eval = F)
-```
-
-
 # Log into vettel
 ```{bash}
 sftp://vettel.bioinf.warwick.ac.uk
 ssh -X u1566273@vettel.bioinf.warwick.ac.uk
-htop -u u1566273
 ```
 
 # Mount share folder
@@ -51,8 +42,6 @@ conda activate <name of environment you created>
  
 conda deactivate
 
-
-
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
 ▓▓   ▓▓ Install new version of SAMtools     ▓▓
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
@@ -85,7 +74,6 @@ multiqc .
 
 # Quality control and trimming with Fastp
 ```{bash}
-
 #change file names
 for i in *_1.fq.gz; do mv -- "$i" "${i%_1.fq.gz}.R1.fq.gz"& done
 for i in *_2.fq.gz; do mv -- "$i" "${i%_1.fq.gz}.R2.fq.gz"& done
@@ -93,13 +81,7 @@ for i in *_2.fq.gz; do mv -- "$i" "${i%_1.fq.gz}.R2.fq.gz"& done
 #trimming fastq.gz files
 conda activate fastp
 
-cd ~/mnt/Shared210/Read_database/Human/2021_11_22_Jing_cell_lines_RNA-seq
-for i in *.R1.fq.gz; do fastp --thread 16 --length_required 40 --cut_right --cut_window_size 4 --cut_mean_quality 20 --overrepresentation_analysis -i $i -I ${i/.R1./.R2.} -o /home/u1566273/RNASEQ_data/2_trimmed/${i/.R1./.R1.trimmed.} -O /home/u1566273/RNASEQ_data/2_trimmed/${i/.R1./.R2.trimmed.} -h /home/u1566273/RNASEQ_data/2_trimmed/${i%.R1.fq.gz}_fastp.html -j /home/u1566273/RNASEQ_data/2_trimmed/${i%.R1.fq.gz}_fastp.json & done
-
-
 for i in *.R1.fq.gz; do fastp --thread 16 --length_required 40 --cut_right --cut_window_size 4 --cut_mean_quality 20 --overrepresentation_analysis -i $i -I ${i/.R1./.R2.} -o /home/u1566273/mnt/Shared342/Jing/2_trimmed/${i/.R1./.R1.trimmed.} -O /home/u1566273/mnt/Shared342/Jing/2_trimmed/${i/.R1./.R2.trimmed.} -h /home/u1566273/mnt/Shared342/Jing/2_trimmed/${i%.R1.fq.gz}_fastp.html -j /home/u1566273/mnt/Shared342/Jing/2_trimmed/${i%.R1.fq.gz}_fastp.json & done
-
-
 ```
 
 # Multiqc reports of fastp
@@ -139,7 +121,6 @@ STAR --runThreadN 20 --runMode genomeGenerate --genomeDir /home/u1566273/referen
 
 ## Mapping
 ```{bash}
-
 cd /home/u1566273/RNASEQ_data/2_trimmed
 time_file="../timing_mapping_STAR.tsv"
 printf "sample\tstart\tend\n" > $time_file
@@ -151,27 +132,7 @@ for i in *R1.trimmed.fq.gz; do
     --quantMode GeneCounts --outTmpDir ../4_alignment/tmp/${i/.R1.*/.} &&
   printf "$(date '+%Y/%m/%d %H:%M:%S')\n" >> $time_file ;
 done
-
-cd /home/u1566273/RNASEQ_data/2_trimmed/plant
-time_file="../timing_mapping_STAR.tsv"
-printf "sample\tstart\tend\n" > $time_file
-for i in *R1.trimmed.fq.gz; do 
-  printf "$i\t$(date '+%Y/%m/%d %H:%M:%S')\t" >> $time_file &&
-  STAR --runThreadN 10 --genomeDir /home/u1566273/reference_genome/human_genome \
-    --readFilesIn $i ${i/.R1./.R2.} --readFilesCommand zcat --outSAMtype BAM SortedByCoordinate \
-    --outFileNamePrefix /home/u1566273/mnt/Shared342/Jing/4_alignment/${i/.R1.*/.}  --outWigType bedGraph --outWigStrand Unstranded \
-    --quantMode GeneCounts --outTmpDir ../../4_alignment/tmp/${i/.R1.*/.} &&
-  printf "$(date '+%Y/%m/%d %H:%M:%S')\n" >> $time_file ;
-done
-
-#tmp is required for the above script
-
-#not enough capacity
-cd /home/u1566273/RNASEQ_data/4_alignment
-for i in /home/u1566273/RNASEQ_data/2_trimmed/*R1.trimmed.fq.gz; do printf "$i\t$(date '+%Y/%m/%d %H:%M:%S')\t" >> $time_file && STAR --runThreadN 4 --genomeDir /home/u1566273/reference_genome/human_genome --readFilesIn $i ${i/.R1./.R2.} --readFilesCommand zcat --outSAMtype BAM SortedByCoordinate --outFileNamePrefix ${i/.R1.*/.}  --outWigType bedGraph --outWigStrand Unstranded --quantMode GeneCounts && printf "$(date '+%Y/%m/%d %H:%M:%S')\n" >> $time_file ; done
-
 ```
-
 
 #umount the share folders
 ```{bash}
@@ -183,8 +144,6 @@ mount mnt/Shared342 #connect to share folder
 (fastqc) u1566273@vettel:~$ du -sh * #check space
 ```
 
-
-The files `.ReadsPerGene.out.tab` contain the counts, but the first 4 lines are `N_unmapped`, `N_multimapping`, `N_noFeature`, `N_ambiguous`, that are used by Multiqc to get statistics. Therefore I remove those out for the counts files with `tail -n +5` and move the whole file to qa
 ```{bash}
 # move the counts data and split the stats
 mkdir human
@@ -194,27 +153,7 @@ for i in *ReadsPerGene.out.tab; do
   mv $i /Volumes/Jing.Y4_2/Hek293/qa/mapped_human
 done
 
-mkdir plant
-cd /Volumes/Jing.Y4_2/Hek293/4_alignment/plant
-for i in *ReadsPerGene.out.tab; do
-  tail -n +5 $i > /Volumes/Jing.Y4_2/Hek293/5_counts/plant/${i/.ReadsPerGene.out.tab/.counts.tsv} &&
-  mv $i /Volumes/Jing.Y4_2/Hek293/qa/mapped_plant
-done
-
 #extract first two columns of counting files
 awk '{print $1,$2}' JY_1.counts.tsv > ../counting_PRRX1/JY_1.count.tsv
 for i in *.counts.tsv; do awk '{print $1,$2}' $i > ../counting_PRRX1/$i & done
-
-
-awk '{print $1,$2}' JY_1.counts.tsv > ../counting_PRRX1/JY_1.count.tsv
-for i in *.counts.tsv; do awk '{print $1,$2}' $i > ../counting_plants/$i & done
-
 ```
-
-
-Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
-
-When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
-
-The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
-
