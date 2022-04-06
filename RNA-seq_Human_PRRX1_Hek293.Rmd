@@ -1,0 +1,152 @@
+---
+title: "RNA-seq_Human_PRRX1_insert"
+author: "Jing Yuan"
+date: "14/01/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Log into vettel
+```{bash}
+sftp://vettel.bioinf.warwick.ac.uk
+ssh -X u1566273@vettel.bioinf.warwick.ac.uk
+htop -u u1566273
+```
+
+# Mount share folder
+```{bash}
+mount ~/mnt/Shared210
+```
+
+# Full path of fast files
+```{bash}
+/home/u1566273/mnt/Shared210/Read_database/Human/2021_11_22_Jing_cell_lines_RNA-seq
+```
+
+# Update program on vettel
+```{bash}
+conda create --name <name of environment you want to create>
+
+# When asked if you want to install [y]/n type y and press enter
+
+conda activate <name of environment you created>
+
+# Google package you want to install and copy the first install command e.g.
+
+conda install -c bioconda fastqc
+
+# When asked if you want to install [y]/n type y and press enter
+# When installed run:
+
+conda activate <name of environment you created>
+
+# Run the command you want to run
+
+# When done type to exit the environment and return to normal vettel
+ 
+conda deactivate
+
+
+
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+▓▓   ▓▓ Install new version of SAMtools     ▓▓
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+samtools # unupdated version
+mkdir ~/bin #  inside ~/.profile there's a line adding ~/bin to $PATH
+mkdir ~/programs
+
+cd ~/programs 
+# get link from htslib.org/download/ (right click, copy link adress)
+wget https://github.com/samtools/samtools/releases/download/1.14/samtools-1.14.tar.bz2
+tar -jxf samtools-1.*.tar.bz2 # unzip
+cd samtools-1.*/
+./configure --prefix=$HOME # tell where to install samtools (that/bin must be in the $PATH)
+make 
+make install
+
+```
+
+# First quality check
+```{bash}
+conda create --name fastqc
+echo ". /shared/software/miniconda3/etc/profile.d/conda.sh" >> ~/.bashrc
+source ./.bashrc
+conda install -c bioconda fastqc
+conda activate fastqc
+conda deactivate fastqc
+fastqc -o /home/u1566273/RNASEQ_data/1_fastqc/ *.fq.gz
+multiqc .
+```
+
+
+# STAR Alignment
+## Build the STAR index
+```{bash}
+#update star on vettel
+cd ~/programs # Get latest STAR source from releases
+wget https://github.com/alexdobin/STAR/archive/2.7.9a.tar.gz
+tar -xzf 2.7.9a.tar.gz
+
+# Compile
+cd STAR-2.7.9a
+cd source
+make STAR
+
+# Add to the PATH
+echo 'export PATH=$HOME/program/STAR-2.7.9a/source:$PATH' >> ~/.profile
+source ~/.profile
+
+STAR --version
+
+cd $dir
+genome="$/home/u1566273/reference_genome/human_genome/GRCh38.p13.genome.fa.gz" # double quotes important
+annotation="$/home/u1566273/reference_genome/human_genome/gencode.v38.annotation.gtf"
+gunzip gencode.v38.annotation.gtf GRCh38.p13.genome.fa.gz 
+
+STAR --runThreadN 20 --runMode genomeGenerate --genomeDir /home/u1566273/reference_genome/PRRX1B --genomeFastaFiles /home/u1566273/reference_genome/PRRX1B/GRCh38.p13.PRRX1B.genome.fa --sjdbGTFfile /home/u1566273/reference_genome/PRRX1B/gencode.v38.PRRX1B.annotation.gtf --sjdbOverhang 149
+
+```
+
+
+## Mapping
+```{bash}
+#PRRX1B
+cd /home/u1566273/RNASEQ_data/2_trimmed
+time_file="../timing_mapping_STAR.tsv"
+printf "sample\tstart\tend\n" > $time_file
+for i in *R1.trimmed.fq.gz; do 
+  printf "$i\t$(date '+%Y/%m/%d %H:%M:%S')\t" >> $time_file &&
+  STAR --runThreadN 15 --genomeDir /home/u1566273/reference_genome/PRRX1B \
+    --readFilesIn $i ${i/.R1./.R2.} --readFilesCommand zcat --outSAMtype BAM SortedByCoordinate \
+    --outFileNamePrefix /home/u1566273/RNASEQ_data/4_alignment/${i/.R1.*/.}  --outWigType bedGraph --outWigStrand Unstranded \
+    --quantMode GeneCounts --outTmpDir /home/u1566273/RNASEQ_data/4_alignment/tmp/${i/.R1.*/.} &&
+  printf "$(date '+%Y/%m/%d %H:%M:%S')\n" >> $time_file ;
+done
+
+#tmp is required for the above script
+
+#one example
+STAR --runThreadN 10 --genomeDir /home/u1566273/reference_genome/human_genome --readFilesIn JY_33.R1.trimmed.fq.gz JY_33.R2.trimmed.fq.gz --readFilesCommand zcat --outSAMtype BAM SortedByCoordinate --outFileNamePrefix /home/u1566273/mnt/Shared342/Jing/4_alignment/JY_33. --outWigType bedGraph --outWigStrand Unstranded --quantMode GeneCounts --outTmpDir ../../4_alignment/tmp/JY_33.
+
+```
+
+
+The files `.ReadsPerGene.out.tab` contain the counts, but the first 4 lines are `N_unmapped`, `N_multimapping`, `N_noFeature`, `N_ambiguous`, that are used by Multiqc to get statistics. Therefore I remove those out for the counts files with `tail -n +5` and move the whole file to qa
+```{bash}
+# move the counts data and split the stats
+for i in *ReadsPerGene.out.tab; do mv "$i" "/Users/u1566273/Desktop/Hek293/Deseq2_PRRX1B/counting_PRRX1B/${i/.ReadsPerGene.out.tab/.counts.tsv}"; done
+
+#extract first two columns of counting files
+awk '{print $1,$2}' JY_1.counts.tsv > ../counting_PRRX1B/JY_1.count.tsv
+for i in *.counts.tsv; do awk '{print $1,$2}' $i > ../counting_PRRX1B/$i & done
+
+```
+
+```{bash}
+grep \"GAPDH\" gencode.v38.annotation.gtf
+
+```
+
