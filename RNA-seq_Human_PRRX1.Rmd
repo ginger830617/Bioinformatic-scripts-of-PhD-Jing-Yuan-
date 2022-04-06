@@ -108,13 +108,6 @@ gunzip gencode.v38.annotation.gtf GRCh38.p13.genome.fa.gz
 
 STAR --runThreadN 20 --runMode genomeGenerate --genomeDir /home/u1566273/reference_genome/PRRX1B --genomeFastaFiles /home/u1566273/reference_genome/PRRX1B/GRCh38.p13.PRRX1B.genome.fa --sjdbGTFfile /home/u1566273/reference_genome/PRRX1B/gencode.v38.PRRX1B.annotation.gtf --sjdbOverhang 149
 
-STAR --runThreadN 20 --runMode genomeGenerate --genomeDir /home/u1566273/reference_genome/JMJ13 --genomeFastaFiles /home/u1566273/reference_genome/JMJ/GRCh38.p13.JMJ13.genome.fa --sjdbGTFfile /home/u1566273/reference_genome/JMJ/gencode.v38.JMJ13.annotation.gtf --sjdbOverhang 149
-
-
-STAR --runThreadN 20 --runMode genomeGenerate --genomeDir /home/u1566273/reference_genome/REF6 --genomeFastaFiles /home/u1566273/reference_genome/REF6/GRCh38.p13.REF6.genome.fa --sjdbGTFfile /home/u1566273/reference_genome/REF6/gencode.v38.REF6.annotation.gtf --sjdbOverhang 149
-
-STAR --runThreadN 20 --runMode genomeGenerate --genomeDir /home/u1566273/reference_genome/ELF6 --genomeFastaFiles /home/u1566273/reference_genome/ELF6/GRCh38.p13.ELF6.genome.fa --sjdbGTFfile /home/u1566273/reference_genome/ELF6/gencode.v38.ELF6.annotation.gtf --sjdbOverhang 149
-
 ```
 
 
@@ -129,46 +122,6 @@ for i in *R1.trimmed.fq.gz; do
   STAR --runThreadN 15 --genomeDir /home/u1566273/reference_genome/PRRX1B \
     --readFilesIn $i ${i/.R1./.R2.} --readFilesCommand zcat --outSAMtype BAM SortedByCoordinate \
     --outFileNamePrefix /home/u1566273/RNASEQ_data/4_alignment/${i/.R1.*/.}  --outWigType bedGraph --outWigStrand Unstranded \
-    --quantMode GeneCounts --outTmpDir /home/u1566273/RNASEQ_data/4_alignment/tmp/${i/.R1.*/.} &&
-  printf "$(date '+%Y/%m/%d %H:%M:%S')\n" >> $time_file ;
-done
-
-#JMJ
-cd /home/u1566273/RNASEQ_data/2_trimmed
-time_file="../timing_mapping_STAR.tsv"
-printf "sample\tstart\tend\n" > $time_file
-for i in *R1.trimmed.fq.gz; do 
-  printf "$i\t$(date '+%Y/%m/%d %H:%M:%S')\t" >> $time_file &&
-  STAR --runThreadN 20 --genomeDir /home/u1566273/reference_genome/JMJ \
-    --readFilesIn $i ${i/.R1./.R2.} --readFilesCommand zcat --outSAMtype BAM SortedByCoordinate \
-    --outFileNamePrefix /home/u1566273/RNASEQ_data/4_alignment/${i/.R1.*/.}  --outWigType bedGraph --outWigStrand Unstranded \
-    --quantMode GeneCounts --outTmpDir /home/u1566273/RNASEQ_data/4_alignment/tmp/${i/.R1.*/.} &&
-  printf "$(date '+%Y/%m/%d %H:%M:%S')\n" >> $time_file ;
-done
-
-#REF6
-cd /home/u1566273/RNASEQ_data/2_trimmed
-time_file="../timing_mapping_STAR.tsv"
-printf "sample\tstart\tend\n" > $time_file
-for i in *R1.trimmed.fq.gz; do 
-  printf "$i\t$(date '+%Y/%m/%d %H:%M:%S')\t" >> $time_file &&
-  STAR --runThreadN 20 --genomeDir /home/u1566273/reference_genome/REF6 \
-    --readFilesIn $i ${i/.R1./.R2.} --readFilesCommand zcat --outSAMtype BAM SortedByCoordinate \
-    --outFileNamePrefix /home/u1566273/RNASEQ_data/4_alignment/${i/.R1.*/.}  --outWigType bedGraph --outWigStrand Unstranded \
-    --quantMode GeneCounts --outTmpDir /home/u1566273/RNASEQ_data/4_alignment/tmp/${i/.R1.*/.} &&
-  printf "$(date '+%Y/%m/%d %H:%M:%S')\n" >> $time_file ;
-done
-
-
-#ELF6
-cd /home/u1566273/RNASEQ_data/2_trimmed
-time_file="../timing_mapping_STAR.tsv"
-printf "sample\tstart\tend\n" > $time_file
-for i in *R1.trimmed.fq.gz; do 
-  printf "$i\t$(date '+%Y/%m/%d %H:%M:%S')\t" >> $time_file &&
-  STAR --runThreadN 20 --genomeDir /home/u1566273/reference_genome/ELF6 \
-    --readFilesIn $i ${i/.R1./.R2.} --readFilesCommand zcat --outSAMtype BAM SortedByCoordinate \
-    --outFileNamePrefix /home/u1566273/mnt/Shared342/Jing/4_alignment/${i/.R1.*/.}  --outWigType bedGraph --outWigStrand Unstranded \
     --quantMode GeneCounts --outTmpDir /home/u1566273/RNASEQ_data/4_alignment/tmp/${i/.R1.*/.} &&
   printf "$(date '+%Y/%m/%d %H:%M:%S')\n" >> $time_file ;
 done
