@@ -1,11 +1,16 @@
 ###RNA-seq analysis of UHCW###
 
-###directory
-/Volumes/shared210/Jing
-sshfs u1566273@myfiles.warwick.ac.uk:  ~/myfiles
-cd ~/myfiles/Shared210--FOHN/Jing/Marcos/2_trim
+###check the quality of sequences
+Fastqc
+for i in *; do fastqc -o ../2_fastqc $i & done
+more all_mod_scores.csv
+for i in *; do fastqc -o ../4_fastqc $i & done
+
+Trim the sequences
+for i in WTCHG_109791_02 WTCHG_109791_04 WTCHG_109791_05 WTCHG_109791_06 WTCHG_110084_07 WTCHG_110084_12 WTCHG_110084_14 WTCHG_110734_15 WTCHG_110734_16 WTCHG_110734_18; do java -jar /home/u1566273/program/Trimmomatic-0.36/trimmomatic-0.36.jar PE -phred33 ${i}_1.fastq.gz ${i}_2.fastq.gz  ../2_trim/${i}_1.fastq.gz ../2_trim/${i}_1UP.fastq.gz ../2_trim/${i}_2.fastq.gz ../2_trim/${i}_2UP.fastq.gz ILLUMINACLIP:/home/u1566273/program/Trimmomatic-0.36/adapters/TruSeq3-PE.fa:2:30:10 LEADING:24 TRAILING:24 SLIDINGWINDOW:4:20 MINLEN:40 ; done
 
 
+###Alignment
 STEP 1: building the STAR index
 ~/Jing/bin/STAR --runThreadN 8 --runMode genomeGenerate --genomeDir /mnt/data/Jing/references/TCGA38 --genomeFastaFiles /mnt/data/Jing/references/TCGA38/GRCh38.d1.vd1.fa --sjdbGTFfile /mnt/data/Jing/references/TCGA38/gencode.v22.annotation.gtf --sjdbOverhang 100
 
