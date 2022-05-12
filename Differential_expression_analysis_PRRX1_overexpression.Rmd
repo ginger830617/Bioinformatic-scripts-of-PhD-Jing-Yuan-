@@ -6,7 +6,7 @@ output: html_document
 highlight: differential expression
 ---
 
-## **R work (DESeq2)**
+## **R work (DESeq2 version 4.2)**
 ### setup
 Libraries and function
 ```{r message=FALSE}
