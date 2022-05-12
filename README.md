@@ -14,6 +14,6 @@ The scripts for all the transcriptome analysis including RNA-seq analysis, diffe
 8. Non-coding RNA of UHCW: gencode.v28.lncRNA_transcripts.fa  gencode.v28.long_noncoding_RNAs.gtf
 9. Coding genes of UHCW: GRCh38.d1.vd1.fa   gencode.v22.annotation.gtf
 10. Chromosomal abnormalities analysis of RNA-seq datasets of UHCW: hg38.fa   hg38.gtf
-       
+     
 =======
 >>>>>>> 
