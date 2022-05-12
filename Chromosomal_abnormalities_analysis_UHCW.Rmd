@@ -9,7 +9,7 @@ output:
     toc: TRUE
     
 ---
-#Analysis of genomic integrity using eSNP-Karyotyping
+#Analysis of genomic integrity using eSNP-Karyotyping published in 2016
 #####Glioblastomas is characterized as heterogeneous disease, and the effect of chromosomal aberrations have been commonly found in the tumorogenesis. According to the previous study, we found genes relevant to centromere are highly expressed in our dataset. Here we adopted eSNP-Karyotyping for our RNA-Seq dataset and present eSNP-Karyotyping for the detection of chromosomal aberrations, based on measuring the ratio of expression between the two alleles.
 
 #####The analysis pipeline is separated into duplications and LOHs detection. The output of the duplication part of the analysis is a moving median graph of the allelic ratios sorted by the chromosomal position.The statistical test is calculated with a one tailed t-test comparing the SNPs major/minor values in each window to the values of the entire genome. The p-values are FDR corrected and displayed as color bar above the moving median plot.
